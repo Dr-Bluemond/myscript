@@ -10,8 +10,8 @@ import random
 import struct
 
 proxy_url = "http://127.0.0.1:7890"
-# trackers_url = "https://raw.githubusercontent.com/ngosang/trackerslist/master/trackers_best.txt"
-trackers_url = "https://github.com/ngosang/trackerslist/raw/refs/heads/master/trackers_all.txt"
+trackers_url = "https://raw.githubusercontent.com/ngosang/trackerslist/master/trackers_best.txt"
+# trackers_url = "https://github.com/ngosang/trackerslist/raw/refs/heads/master/trackers_all.txt"
 qbit_host = 'http://192.168.1.100:8080'
 timeout = 3
 
@@ -118,7 +118,7 @@ async def check_tracker(tracker):
     parsed_url = urlparse(tracker)
     if parsed_url.scheme == 'udp':
         host = parsed_url.hostname
-        port = parsed_url.port or 80
+        port = parsed_url.port
         t = await test_udp_tracker(host, port)
         return (tracker, t) if t else None
     elif parsed_url.scheme in ['http', 'https']:
@@ -210,7 +210,7 @@ def update_tracker(trackers):
                         print(f"Failed to add tracker {tracker} to {torrent.name}: {e}")
 
     # 创建一个包含 trackers 的字符串，以逗号分隔
-    trackers_str = ',\n'.join(trackers)
+    trackers_str = '\n'.join(trackers)
 
     # 设置 preferences
     try:
