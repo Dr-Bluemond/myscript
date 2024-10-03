@@ -1,0 +1,1 @@
+该脚本将获取外网ipv4和ipv6地址，并更新到cloudflare对应dns
