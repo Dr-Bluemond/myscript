@@ -8,28 +8,18 @@ import asyncio
 import random
 import struct
 
-<<<<<<< HEAD
 # 主要参数：
 PROXY_URL = "http://127.0.0.1:8000"
 QBITTORRENT_API = "http://127.0.0.1:8080"
-=======
->>>>>>> 0908eb8cd4716546c89d12344e92df34adf3d3be
 TRACKERSLIST_BEST = "https://raw.githubusercontent.com/ngosang/trackerslist/master/trackers_best.txt"
 TRACKERSLIST_ALL = "https://raw.githubusercontent.com/ngosang/trackerslist/master/trackers_all.txt"
 
 class TrackerChecker:
     def __init__(self,
-<<<<<<< HEAD
                  proxy_url=PROXY_URL,
                  trackers_url=TRACKERSLIST_ALL,
                  timeout=2,
                  best_tracker_count=20):
-=======
-                 proxy_url="http://127.0.0.1:8000",
-                 trackers_url=TRACKERSLIST_ALL,
-                 timeout=2,
-                 best_tracker_count=30):
->>>>>>> 0908eb8cd4716546c89d12344e92df34adf3d3be
         self.proxy_url = proxy_url
         self.trackers_url = trackers_url
         self.timeout = timeout
@@ -88,11 +78,7 @@ class TrackerChecker:
         connection_id = 0x41727101980
         packet = struct.pack(">QLL", connection_id, 0, transaction_id)
 
-<<<<<<< HEAD
         loop = asyncio.get_running_loop()
-=======
-        loop = asyncio.get_event_loop()
->>>>>>> 0908eb8cd4716546c89d12344e92df34adf3d3be
         try:
             transport, protocol = await loop.create_datagram_endpoint(
                 self.MyProtocol, local_addr=('0.0.0.0', 0)
@@ -163,7 +149,6 @@ class TrackerChecker:
         if not self.trackers:
             return []
 
-<<<<<<< HEAD
         async def _run():
             semaphore = asyncio.Semaphore(30)
             results = []
@@ -183,13 +168,6 @@ class TrackerChecker:
             return raw_results
 
         results = asyncio.run(_run())
-=======
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-
-        tasks = [self._check_tracker(t) for t in self.trackers]
-        results = loop.run_until_complete(asyncio.gather(*tasks))
->>>>>>> 0908eb8cd4716546c89d12344e92df34adf3d3be
 
         valid = [r for r in results if r]
         sorted_trackers = sorted(valid, key=lambda x: (-x[1], x[2]))
@@ -202,11 +180,7 @@ class TrackerChecker:
         return best_trackers
 
 def update_tracker(trackers):
-<<<<<<< HEAD
     client = qbittorrentapi.Client(host=QBITTORRENT_API)
-=======
-    client = qbittorrentapi.Client(host='http://127.0.0.1:8080')
->>>>>>> 0908eb8cd4716546c89d12344e92df34adf3d3be
     try:
         client.auth_log_in()
         print("\nConnected to qBittorrent:")
@@ -235,8 +209,4 @@ if __name__ == "__main__":
     checker = TrackerChecker(trackers_url=TRACKERSLIST_ALL)
     checker.fetch_trackers()
     best_trackers = checker.check_trackers()
-<<<<<<< HEAD
     update_tracker(best_trackers)
-=======
-    update_tracker(best_trackers)
->>>>>>> 0908eb8cd4716546c89d12344e92df34adf3d3be
