@@ -3,7 +3,6 @@
 import subprocess
 import requests
 import datetime
-import sys
 import re
 
 ZONE_ID = "<hidden>"
@@ -64,7 +63,7 @@ def get_existing_dns_records():
             print(f"无法获取DNS记录列表，状态码: {response.status_code}, {response.text}")
     except Exception as e:
         print(f"获取DNS记录时出错: {e}")
-    return {}
+    return None
 
 
 # 更新DNS记录
@@ -116,6 +115,20 @@ def create_dns_record(name, record_type, content):
         print(f"创建DNS记录时出错: {e}")
 
 
+# 记录DNS变化到日志文件
+def log_dns_change(record_name, record_type, old_value, new_value):
+    log_file = "/var/log/ddns.log"
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    log_entry = f"{timestamp} - 域名: {record_name}, 类型: {record_type}, 原值: {old_value}, 新值: {new_value}\n"
+
+    try:
+        with open(log_file, "a", encoding="utf-8") as f:
+            f.write(log_entry)
+        print(f"已记录DNS变化到日志文件: {log_file}")
+    except Exception as e:
+        print(f"写入日志文件时出错: {e}")
+
+
 # 封装检查和更新DNS记录的逻辑
 def check_and_update_dns_record(record_name, record_type, content, existing_records):
     # 使用 (record_name, record_type) 作为联合主键
@@ -123,12 +136,17 @@ def check_and_update_dns_record(record_name, record_type, content, existing_reco
     if key in existing_records:
         record = existing_records[key]
         if record['content'] != content:  # 只在内容改变时更新
-            print(f"{record_type}记录内容变化，旧值: {record['content']}，新值: {content}")
+            old_value = record['content']
+            print(f"{record_type}记录内容变化，旧值: {old_value}，新值: {content}")
+            # 记录DNS变化到日志文件
+            log_dns_change(record_name, record_type, old_value, content)
             update_dns_record(record['id'], record_name, record_type, content)
         else:
             print(f"{record_type}记录内容未变化，无需更新")
     else:
         print(f"{record_type}记录 {record_name} 不存在，创建新记录")
+        # 创建新记录时也记录到日志，原值为空
+        log_dns_change(record_name, record_type, "无", content)
         create_dns_record(record_name, record_type, content)
 
 
@@ -147,7 +165,9 @@ def main():
 
     # 查询现有DNS记录
     existing_records = get_existing_dns_records()
-
+    if existing_records is None:
+        print("无法获取现有DNS记录，程序终止")
+        return
     print_dns_records(existing_records)
 
     # 更新或创建IPv6记录
