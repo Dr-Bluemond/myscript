@@ -4,9 +4,10 @@ import subprocess
 import requests
 import datetime
 import re
+import os
 
-ZONE_ID = "<hidden>"
-TOKEN = "<hidden>"
+TOKEN = "hidden"
+ZONE_ID = "hidden"
 
 # 获取IPv6地址
 def get_ipv6():
@@ -44,12 +45,12 @@ def get_ipv4():
     return None
 
 # 查询现有的DNS记录并返回记录字典
-def get_existing_dns_records():
-    url = f"https://api.cloudflare.com/client/v4/zones/{ZONE_ID}/dns_records"
+def get_existing_dns_records(zone_id):
+    url = f"https://api.cloudflare.com/client/v4/zones/{zone_id}/dns_records"
     headers = {
-            "Authorization": f"Bearer {TOKEN}",
-            "Content-Type": "application/json"
-            }
+        "Authorization": f"Bearer {TOKEN}",
+        "Content-Type": "application/json"
+    }
 
     try:
         response = requests.get(url, headers=headers)
@@ -67,19 +68,19 @@ def get_existing_dns_records():
 
 
 # 更新DNS记录
-def update_dns_record(record_id, name, record_type, content):
-    url = f"https://api.cloudflare.com/client/v4/zones/{ZONE_ID}/dns_records/{record_id}"
+def update_dns_record(zone_id, record_id, name, record_type, content):
+    url = f"https://api.cloudflare.com/client/v4/zones/{zone_id}/dns_records/{record_id}"
     headers = {
-            "Authorization": f"Bearer {TOKEN}",
-            "Content-Type": "application/json"
-            }
+        "Authorization": f"Bearer {TOKEN}",
+        "Content-Type": "application/json"
+    }
     data = {
-            "content": content,
-            "name": name,
-            "proxied": False,
-            "type": record_type,
-            "ttl": 1
-            }
+        "content": content,
+        "name": name,
+        "proxied": False,
+        "type": record_type,
+        "ttl": 60
+    }
 
     try:
         response = requests.put(url, json=data, headers=headers)
@@ -91,19 +92,19 @@ def update_dns_record(record_id, name, record_type, content):
         print(f"请求出错: {e}")
 
 # 创建新的DNS记录
-def create_dns_record(name, record_type, content):
-    url = f"https://api.cloudflare.com/client/v4/zones/{ZONE_ID}/dns_records"
+def create_dns_record(zone_id, name, record_type, content):
+    url = f"https://api.cloudflare.com/client/v4/zones/{zone_id}/dns_records"
     headers = {
-            "Authorization": f"Bearer {TOKEN}",
-            "Content-Type": "application/json"
-            }
+        "Authorization": f"Bearer {TOKEN}",
+        "Content-Type": "application/json"
+    }
     data = {
-            "type": record_type,
-            "name": name,
-            "content": content,
-            "ttl": 1,
-            "proxied": False
-            }
+        "type": record_type,
+        "name": name,
+        "content": content,
+        "ttl": 60,
+        "proxied": False
+    }
 
     try:
         response = requests.post(url, json=data, headers=headers)
@@ -130,7 +131,7 @@ def log_dns_change(record_name, record_type, old_value, new_value):
 
 
 # 封装检查和更新DNS记录的逻辑
-def check_and_update_dns_record(record_name, record_type, content, existing_records):
+def check_and_update_dns_record(zone_id, record_name, record_type, content, existing_records):
     # 使用 (record_name, record_type) 作为联合主键
     key = (record_name, record_type)
     if key in existing_records:
@@ -140,14 +141,17 @@ def check_and_update_dns_record(record_name, record_type, content, existing_reco
             print(f"{record_type}记录内容变化，旧值: {old_value}，新值: {content}")
             # 记录DNS变化到日志文件
             log_dns_change(record_name, record_type, old_value, content)
-            update_dns_record(record['id'], record_name, record_type, content)
+            update_dns_record(zone_id, record['id'], record_name, record_type, content)
+            return True
         else:
             print(f"{record_type}记录内容未变化，无需更新")
+            return False
     else:
         print(f"{record_type}记录 {record_name} 不存在，创建新记录")
         # 创建新记录时也记录到日志，原值为空
         log_dns_change(record_name, record_type, "无", content)
-        create_dns_record(record_name, record_type, content)
+        create_dns_record(zone_id, record_name, record_type, content)
+        return True
 
 
 # 将DNS记录漂亮打印
@@ -164,19 +168,26 @@ def main():
     ipv4 = get_ipv4()
 
     # 查询现有DNS记录
-    existing_records = get_existing_dns_records()
+    existing_records = get_existing_dns_records(ZONE_ID)
     if existing_records is None:
         print("无法获取现有DNS记录，程序终止")
         return
     print_dns_records(existing_records)
 
+    updated = False
     # 更新或创建IPv6记录
     if ipv6:
-        check_and_update_dns_record("<hidden>", "AAAA", ipv6, existing_records)
+        updated |= check_and_update_dns_record(ZONE_ID, "hidden.com", "AAAA", ipv6, existing_records)
+        check_and_update_dns_record(ZONE_ID, "hidden.com", "AAAA", ipv6, existing_records)
 
     # 更新或创建IPv4记录
     if ipv4:
-        check_and_update_dns_record("<hidden>", "A", ipv4, existing_records)
+        updated |= check_and_update_dns_record(ZONE_ID, "hidden.com", "A", ipv4, existing_records)
+        check_and_update_dns_record(ZONE_ID, "hidden.com", "A", ipv4, existing_records)
+
+    if updated:
+        os.system("systemctl restart qbittorrent-nox@qbtuser.service")
+        os.system("systemctl restart qbittorrent-nox@qptuser.service")
 
 if __name__ == "__main__":
     main()
