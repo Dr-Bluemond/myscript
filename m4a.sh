@@ -1,12 +1,5 @@
 #!/bin/bash
 
-# 用法说明
-if [ $# -ne 1 ]; then
-  echo "用法: $0 <音频文件或目录的绝对路径>"
-  exit 1
-fi
-
-input_path="$1"
 
 # 处理单个文件
 process_file() {
@@ -29,22 +22,43 @@ process_file() {
   local ext="${base##*.}"
   local ext_lower=$(echo "$ext" | tr 'A-Z' 'a-z')
   local output_file="$dir/$name.m4a"
-  local cover_image="$dir/${name}_cover.jpg"
+  local cover_image="$dir/${name}_COVER.png"
   local converted_dir="$dir/converted"
 
   echo "正在处理: $input_file"
 
-  # 提取封面
-  ffmpeg -loglevel error -i "$input_file" -an -vcodec copy "$cover_image"
+  codec=$(ffprobe -v error -select_streams a:0 \
+      -show_entries stream=codec_name \
+      -of default=noprint_wrappers=1:nokey=1 \
+      "$input_file")
 
-  if [ "$ext_lower" == "flac" ]; then
-    audio_codec="alac"
-  elif [ "$ext_lower" == "mp3" ]; then
-    audio_codec="aac"
+  echo "实际编码格式: $codec"
+
+    # 根据真实 codec 决定转码方式
+  case "$codec" in
+    flac)
+      audio_codec="alac"
+      ;;
+    mp3)
+      audio_codec="aac"
+      ;;
+    *)
+      echo "⚠️ 不支持的实际音频编码: $codec，跳过 $input_file"
+      return
+      ;;
+  esac
+
+  # 提取封面
+  ffmpeg -loglevel error -i "$input_file" -an -vcodec png "$cover_image"
+  cover_status=$?
+
+  if [ $cover_status -ne 0 ] || [ ! -f "$cover_image" ]; then
+    echo "⚠️ 封面提取失败或不存在，将不嵌入封面"
+  else
+    echo "✅ 封面提取成功: $cover_image"
   fi
 
   if [ ! -f "$cover_image" ]; then
-    echo "⚠️ 未找到封面图像，将不嵌入封面"
     ffmpeg -loglevel error -i "$input_file" -vn -c:a "$audio_codec" "$output_file"
   else
     ffmpeg -loglevel error \
@@ -71,6 +85,12 @@ process_file() {
   fi
 }
 
+if [ $# -ne 1 ]; then
+  input_path="/home/"
+else
+  input_path="$1"
+fi
+
 # 如果是目录，则遍历
 if [ -d "$input_path" ]; then
   for file in "$input_path"/*; do
@@ -84,4 +104,3 @@ else
   echo "错误：输入路径无效：$input_path"
   exit 1
 fi
-
