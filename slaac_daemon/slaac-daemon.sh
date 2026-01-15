@@ -1,7 +1,7 @@
 #!/bin/bash
 # 简易 SLAAC 动态守护脚本
 # 自动检测 IPv6 前缀变化并更新地址
-# 依赖: radvdump, rdisc6, ip, awk, grep, cut
+# 依赖: rdisc6, ip, awk, grep, cut
 
 IFACE="$1"
 STATEFILE="/run/slaac-${IFACE}.prefix"
@@ -17,7 +17,7 @@ apply_address() {
     echo "[`date '+%F %T'`] applying prefix: $prefix"
     ip -6 addr flush dev "$IFACE" scope global
     ip -6 addr add "${addr}/64" dev "$IFACE"
-    ip -6 route replace default via fe80::1 dev eth0
+    ip -6 route replace default via fe80::1 dev "$IFACE"
 }
 
 monitor_ra() {
@@ -26,10 +26,10 @@ monitor_ra() {
         # 匹配前缀行，去掉前导空格
         if [[ "$line" =~ ^[[:space:]]*prefix[[:space:]]+([0-9a-fA-F:]+)\/[0-9]+ ]]; then
             prefix="${BASH_REMATCH[1]}"
-	    echo "[`date '+%F %T'`] Prefix received: $prefix"
+            echo "[`date '+%F %T'`] Prefix received: $prefix"
             oldprefix=$(cat "$STATEFILE" 2>/dev/null)
             if [ "$prefix" != "$oldprefix" ]; then
-		echo "[`date '+%F %T'`] Prefix changed from $oldprefix to $prefix"
+                echo "[`date '+%F %T'`] Prefix changed from $oldprefix to $prefix"
                 echo "$prefix" > "$STATEFILE"
                 apply_address "$prefix"
             fi
@@ -48,4 +48,3 @@ main() {
 }
 
 main
-
