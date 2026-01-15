@@ -15,17 +15,11 @@ import subprocess
 import sys
 import time
 from dataclasses import dataclass
-from datetime import datetime
 from typing import Optional
 
 
 _RE_RA_FROM = re.compile(r"^#\s*based\s+on\s+Router\s+Advertisement\s+from\s+([0-9a-fA-F:]+)\s*$")
 _RE_PREFIX = re.compile(r"^\s*prefix\s+([0-9a-fA-F:]+)\/(\d+)\s*$")
-
-
-def log(message: str) -> None:
-    ts = datetime.now().strftime("%F %T")
-    print(f"[{ts}] {message}", flush=True)
 
 
 @dataclass(frozen=True)
@@ -49,7 +43,7 @@ def run_ip(args: list[str]) -> None:
 def apply_address(iface: str, prefix: str, prefix_len: int, gateway: str) -> None:
     addr = calc_host_address(prefix, prefix_len)
 
-    log(f"applying: prefix={prefix}/{prefix_len} addr={addr}/{prefix_len} gw={gateway}")
+    print(f"applying: prefix={prefix}/{prefix_len} addr={addr}/{prefix_len} gw={gateway}", flush=True)
 
     # Similar to the bash version: flush global, add address, set default route.
     run_ip(["ip", "-6", "addr", "flush", "dev", iface, "scope", "global"])
@@ -62,7 +56,7 @@ def monitor_radvdump(iface: str) -> None:
     gateway: Optional[str] = None
 
     while True:
-        log(f"starting radvdump on {iface}...")
+        print(f"starting radvdump on {iface}...", flush=True)
         try:
             proc = subprocess.Popen(
                 ["radvdump"],
@@ -73,7 +67,7 @@ def monitor_radvdump(iface: str) -> None:
                 bufsize=1,
             )
         except FileNotFoundError:
-            log("error: radvdump not found in PATH")
+            print("error: radvdump not found in PATH", flush=True)
             raise
 
         # After listener is up, send one RS to solicit an RA (ignore output).
@@ -87,9 +81,9 @@ def monitor_radvdump(iface: str) -> None:
                 text=True,
             )
         except FileNotFoundError:
-            log("warn: rdisc6 not found in PATH; waiting for unsolicited RA")
+            print("warn: rdisc6 not found in PATH; waiting for unsolicited RA", flush=True)
         except subprocess.TimeoutExpired:
-            log("warn: rdisc6 timed out; waiting for unsolicited RA")
+            print("warn: rdisc6 timed out; waiting for unsolicited RA", flush=True)
 
         try:
             assert proc.stdout is not None
@@ -99,7 +93,7 @@ def monitor_radvdump(iface: str) -> None:
                 m = _RE_RA_FROM.match(line)
                 if m:
                     gateway = m.group(1)
-                    log(f"gateway received: {gateway}")
+                    print(f"gateway received: {gateway}", flush=True)
                     continue
 
                 m = _RE_PREFIX.match(line)
@@ -108,27 +102,28 @@ def monitor_radvdump(iface: str) -> None:
 
                 prefix = m.group(1)
                 prefix_len = int(m.group(2))
-                log(f"prefix received: {prefix}/{prefix_len}")
+                print(f"prefix received: {prefix}/{prefix_len}", flush=True)
 
                 if not gateway:
-                    log("warn: got prefix but no gateway yet; skipping apply")
+                    print("warn: got prefix but no gateway yet; skipping apply", flush=True)
                     continue
 
                 new_state = RaState(prefix=prefix, prefix_len=prefix_len, gateway=gateway)
                 if new_state == last_applied:
                     continue
 
-                log(
+                print(
                     f"change detected: "
                     f"{(last_applied.prefix + '/' + str(last_applied.prefix_len)) if last_applied else 'None'} -> {prefix}/{prefix_len}, "
-                    f"gw={(last_applied.gateway if last_applied else 'None')} -> {gateway}"
+                    f"gw={(last_applied.gateway if last_applied else 'None')} -> {gateway}",
+                    flush=True,
                 )
 
                 try:
                     apply_address(iface, prefix, prefix_len, gateway)
                 except subprocess.CalledProcessError as e:
                     stderr = (e.stderr or "").strip()
-                    log(f"error: ip command failed: {e.cmd}; stderr={stderr}")
+                    print(f"error: ip command failed: {e.cmd}; stderr={stderr}", flush=True)
                     continue
                 last_applied = new_state
         finally:
@@ -150,7 +145,7 @@ def monitor_radvdump(iface: str) -> None:
                 except Exception:
                     pass
 
-        log("radvdump exited; restarting in 1s")
+        print("radvdump exited; restarting in 1s", flush=True)
         time.sleep(1)
 
 
@@ -160,7 +155,7 @@ def main(argv: list[str]) -> int:
     args = parser.parse_args(argv)
 
     iface = args.iface
-    log(f"slaac-daemon starting on {iface}")
+    print(f"slaac-daemon starting on {iface}", flush=True)
     monitor_radvdump(iface)
     return 0
 
